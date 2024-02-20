@@ -1,0 +1,43 @@
+on: [push, pull_request]
+
+name: CI
+
+# In this minimalistic repo, the postgres service is for the compile time query checking.
+# Not yet used in the tests.
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: "123"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: "postgresql://postgres:123@localhost/sqlxum_test"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Database
+        run: |
+          cargo install sqlx-cli --features postgres
+          sqlx db setup
+      - run: cargo build --verbose
+      - run: cargo test
+      - run: rustup component add clippy
+      - run: cargo clippy -- -D warnings
+
+  fmt:
+    # just formatting doesn't need the database
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo fmt --all -- --check
